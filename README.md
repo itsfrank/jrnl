@@ -7,16 +7,16 @@ A Git-backed, AI-assisted personal journal for the terminal. Raw notes are store
 Install the latest version directly from GitHub:
 
 ```bash
-npm install --global git+https://github.com/itsfrank/jrnl.git
+npm install --global --install-links github:itsfrank/jrnl
 ```
 
 To install a specific tag, branch, or commit, append a Git ref:
 
 ```bash
-npm install --global git+https://github.com/itsfrank/jrnl.git#<ref>
+npm install --global --install-links github:itsfrank/jrnl#<ref>
 ```
 
-npm runs the package's `prepare` script after cloning, which compiles the TypeScript source before installing the CLI. Requires Node.js 22+, Git, and access to Pi either directly or through a configured sandbox command.
+`--install-links` ensures npm copies the prepared package instead of linking to its temporary Git checkout. npm runs the package's `prepare` script after cloning, which installs build dependencies in the checkout when necessary and compiles the TypeScript source. Requires Node.js 22+, Git, and access to Pi either directly or through a configured sandbox command.
 
 ## Development setup
 
