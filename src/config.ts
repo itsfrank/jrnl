@@ -15,14 +15,16 @@ export interface JrnlConfig {
 export function configPath(): string {
   return process.env.JRNL_CONFIG_PATH
     ? resolve(process.env.JRNL_CONFIG_PATH)
-    : join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "jrnl.toml");
+    : join(configHome(), "jrnl", "jrnl.toml");
 }
 
 export async function hasConfig(): Promise<boolean> {
+  await migrateLegacyConfig();
   return exists(configPath());
 }
 
 export async function loadConfig(): Promise<JrnlConfig> {
+  await migrateLegacyConfig();
   const path = configPath();
   let raw: string;
   try {
@@ -69,6 +71,25 @@ export async function saveConfig(config: JrnlConfig): Promise<void> {
 
 export function formatConfig(config: JrnlConfig): string {
   return stringify({ repo: config.repo, pi: { command: config.pi.command } });
+}
+
+function configHome(): string {
+  return process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
+}
+
+async function migrateLegacyConfig(): Promise<void> {
+  if (process.env.JRNL_CONFIG_PATH) {
+    return;
+  }
+
+  const currentPath = configPath();
+  const legacyPath = join(configHome(), "jrnl.toml");
+  if (await exists(currentPath) || !(await exists(legacyPath))) {
+    return;
+  }
+
+  await mkdir(dirname(currentPath), { recursive: true });
+  await rename(legacyPath, currentPath);
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

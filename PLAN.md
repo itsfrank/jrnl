@@ -51,7 +51,7 @@
 
 ## Configuration
 
-Configuration lives at `~/.config/jrnl.toml` and defines the journal repository and Pi launch command. The Pi command is stored as an argument array so sandbox wrappers can be configured safely.
+Configuration lives at `~/.config/jrnl/jrnl.toml` and defines the journal repository and Pi launch command. The Pi command is stored as an argument array so sandbox wrappers can be configured safely.
 
 ```toml
 repo = "~/path/to/jrnl"

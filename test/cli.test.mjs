@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
+import { configPath, loadConfig } from "../dist/config.js";
 import { parseCommandLine } from "../dist/utils.js";
 
 const cli = join(process.cwd(), "dist/cli.js");
@@ -22,6 +23,29 @@ test("parseCommandLine preserves quoted command arguments", () => {
     "work journal",
     "pi",
   ]);
+});
+
+test("config uses an application directory and migrates the legacy path", async () => {
+  const root = await mkdtemp(join(tmpdir(), "jrnl-config-test-"));
+  const legacyPath = join(root, "jrnl.toml");
+  const expectedPath = join(root, "jrnl", "jrnl.toml");
+  const previousXdgConfigHome = process.env.XDG_CONFIG_HOME;
+  const previousConfigPath = process.env.JRNL_CONFIG_PATH;
+
+  try {
+    process.env.XDG_CONFIG_HOME = root;
+    delete process.env.JRNL_CONFIG_PATH;
+    const content = 'repo = "/tmp/journal"\n\n[pi]\ncommand = [ "pi" ]\n';
+    await writeFile(legacyPath, content);
+
+    assert.equal(configPath(), expectedPath);
+    assert.deepEqual(await loadConfig(), { repo: "/tmp/journal", pi: { command: ["pi"] } });
+    assert.equal(await readFile(expectedPath, "utf8"), content);
+    await assert.rejects(readFile(legacyPath, "utf8"), { code: "ENOENT" });
+  } finally {
+    restoreEnvironment("XDG_CONFIG_HOME", previousXdgConfigHome);
+    restoreEnvironment("JRNL_CONFIG_PATH", previousConfigPath);
+  }
 });
 
 test("init, note, process, amendment detection, status, and ask", async () => {
@@ -195,6 +219,14 @@ EOF
   assert.match(content, /Local task/);
   assert.match(content, /Remote task/);
 });
+
+function restoreEnvironment(name, value) {
+  if (value === undefined) {
+    delete process.env[name];
+  } else {
+    process.env[name] = value;
+  }
+}
 
 function run(args, env, input) {
   return spawnSync(process.execPath, [cli, ...args], {

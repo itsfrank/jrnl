@@ -36,7 +36,7 @@ Create or choose a remote Git repository, then run:
 jrnl init
 ```
 
-The interactive setup asks for the local journal folder, Git URL, and Pi command. Configuration is stored in `~/.config/jrnl.toml`:
+The interactive setup asks for the local journal folder, Git URL, and Pi command. Configuration is stored in `~/.config/jrnl/jrnl.toml`:
 
 ```toml
 repo = "/absolute/path/to/journal"
