@@ -13,6 +13,7 @@
 ## `jrnl note`
 
 - Accept note text as arguments or from standard input.
+- With no arguments in an interactive terminal, open a temporary Markdown file using `$EDITOR`; require the variable to be set and cancel if the file remains empty or unsaved.
 - Store every timestamped note as a separate source file with a stable name and unique suffix.
 - Commit the note locally before attempting synchronization.
 - Pull/rebase and push automatically after capture.

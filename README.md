@@ -57,6 +57,7 @@ Pi uses its own configured default model.
 ## Commands
 
 ```bash
+jrnl note                              # write a Markdown note in $EDITOR
 jrnl note "Atlas is blocked on security review"
 jrnl "Finished the migration"        # note shorthand
 echo "Follow up Friday" | jrnl note
@@ -72,7 +73,7 @@ jrnl pi                               # interactive Pi with journal context
 jrnl pi -- --thinking high            # forward arguments to Pi
 ```
 
-Run `jrnl <command> --help` for command-specific help.
+Run `jrnl <command> --help` for command-specific help. `jrnl note` with no text opens a temporary Markdown file using `$EDITOR`, which must be set to your preferred editor (for example, `export EDITOR=nvim`). Empty or unsaved files cancel the note.
 
 ## Journal layout
 

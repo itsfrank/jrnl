@@ -125,7 +125,7 @@ export async function confirm(prompt: string): Promise<boolean> {
 }
 
 /** Parse a command line into argv without invoking a shell. */
-export function parseCommandLine(input: string): string[] {
+export function parseCommandLine(input: string, label = "Command"): string[] {
   const args: string[] = [];
   let current = "";
   let quote: "single" | "double" | undefined;
@@ -167,10 +167,10 @@ export function parseCommandLine(input: string): string[] {
   }
 
   if (escaped || quote !== undefined) {
-    throw new JrnlError("Pi command contains an unmatched quote or trailing escape.");
+    throw new JrnlError(`${label} contains an unmatched quote or trailing escape.`);
   }
   if (started) args.push(current);
-  if (args.length === 0) throw new JrnlError("Pi command cannot be empty.");
+  if (args.length === 0) throw new JrnlError(`${label} cannot be empty.`);
   return args;
 }
 

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { configPath, loadConfig } from "../dist/config.js";
+import { editNote, editorCommand } from "../dist/editor.js";
 import { parseCommandLine } from "../dist/utils.js";
 
 const cli = join(process.cwd(), "dist/cli.js");
@@ -23,6 +24,44 @@ test("parseCommandLine preserves quoted command arguments", () => {
     "work journal",
     "pi",
   ]);
+});
+
+test("editor note input captures Markdown and handles cancellation", async () => {
+  const root = await mkdtemp(join(tmpdir(), "jrnl-editor-test-"));
+  const fakeEditor = join(root, "fake-editor");
+  await writeFile(fakeEditor, `#!/bin/sh
+case "$1" in
+  "long note")
+    cat > "$2" <<'EOF'
+# Project update
+
+- First item
+- Second item
+EOF
+    ;;
+  blank)
+    printf '  \\n\\n' > "$2"
+    ;;
+  untouched)
+    ;;
+  fail)
+    exit 7
+    ;;
+esac
+`, "utf8");
+  await chmod(fakeEditor, 0o755);
+
+  assert.throws(
+    () => editorCommand(undefined),
+    /`EDITOR` is not set.*export EDITOR=nvim/,
+  );
+  assert.equal(
+    await editNote(`${fakeEditor} "long note"`),
+    "# Project update\n\n- First item\n- Second item\n",
+  );
+  assert.equal(await editNote(`${fakeEditor} blank`), undefined);
+  assert.equal(await editNote(`${fakeEditor} untouched`), undefined);
+  await assert.rejects(editNote(`${fakeEditor} fail`), /Editor exited with status 7/);
 });
 
 test("config uses an application directory and migrates the legacy path", async () => {

@@ -57,7 +57,7 @@ export async function runInit(): Promise<void> {
     }
 
     const commandAnswer = (await prompt.question("Pi command [pi]: ")).trim();
-    piCommand = parseCommandLine(commandAnswer || "pi");
+    piCommand = parseCommandLine(commandAnswer || "pi", "Pi command");
 
     console.log(`\nJournal folder: ${folder}\nGit repository: ${gitUrl}\nPi command: ${JSON.stringify(piCommand)}`);
     const confirmation = (await prompt.question("\nCreate configuration? [Y/n] ")).trim().toLowerCase();

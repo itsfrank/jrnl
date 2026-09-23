@@ -19,7 +19,7 @@ const HELP = `jrnl — a Git-backed, AI-assisted personal journal
 
 Usage:
   jrnl init
-  jrnl note <text>
+  jrnl note [text]            Open $EDITOR when text is omitted
   jrnl <text>                 Shorthand for jrnl note <text>
   jrnl process
   jrnl upgrade [--migrate]
@@ -36,7 +36,7 @@ Options:
 
 const COMMAND_HELP: Record<string, string> = {
   init: "Usage: jrnl init\n\nInteractively configure and synchronize a journal repository.",
-  note: "Usage: jrnl note <text>\n       echo <text> | jrnl note\n\nSave, commit, and synchronize a source note.",
+  note: "Usage: jrnl note [text]\n       echo <text> | jrnl note\n\nSave, commit, and synchronize a source note. With no text, open $EDITOR (which must be set).",
   process: "Usage: jrnl process\n\nUse Pi to process changed notes into journal memory.",
   upgrade: "Usage: jrnl upgrade [--migrate]\n\nUpdate managed static files, or migrate an older repository schema.",
   ask: "Usage: jrnl ask <question>\n       echo <question> | jrnl ask\n\nAsk Pi a read-only question about the journal.",

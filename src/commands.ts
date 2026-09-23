@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { requireCompatibleRepository } from "./compatibility.js";
 import { loadConfig, type JrnlConfig } from "./config.js";
+import { editNote } from "./editor.js";
 import { GitConflictError, IncompatibleSchemaError, JrnlError } from "./errors.js";
 import {
   abortRebase,
@@ -40,7 +41,11 @@ export async function runNote(arguments_: readonly string[]): Promise<void> {
     await requireCompatibleRepository(config.repo);
     await requireClean(config.repo);
   });
-  const text = await argumentOrStdin(arguments_, "note");
+  const text = await noteText(arguments_);
+  if (text === undefined) {
+    console.log("Note cancelled; the editor file was empty.");
+    return;
+  }
   const path = await createNote(config.repo, text);
   const commit = await withActivity("Saving note", async () => {
     await commitPaths(config.repo, [path], `jrnl note: ${path.split("/").at(-1)?.replace(/\.md$/, "")}`);
@@ -264,6 +269,20 @@ async function syncCompatibleRepository(config: JrnlConfig, warnAgents = true) {
       await requireCompatibleRepository(config.repo, { warnAgents: false });
     },
   });
+}
+
+async function noteText(arguments_: readonly string[]): Promise<string | undefined> {
+  if (arguments_.some((argument) => argument.startsWith("-"))) {
+    throw new JrnlError("Unknown option. Pass note text as arguments or standard input.");
+  }
+  const argumentText = arguments_.join(" ").trim();
+  if (argumentText) return argumentText;
+  if (!process.stdin.isTTY) {
+    const piped = (await readStandardInput()).trim();
+    if (piped) return piped;
+    throw new JrnlError("Missing note text.");
+  }
+  return editNote();
 }
 
 async function argumentOrStdin(arguments_: readonly string[], label: string): Promise<string> {
