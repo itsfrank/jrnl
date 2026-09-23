@@ -2,6 +2,22 @@
 
 A Git-backed, AI-assisted personal journal for the terminal. Raw notes are stored as individual Markdown files; Pi turns changed notes into concise project memory when asked.
 
+## Install
+
+Install the latest version directly from GitHub:
+
+```bash
+npm install --global git+https://github.com/itsfrank/jrnl.git
+```
+
+To install a specific tag, branch, or commit, append a Git ref:
+
+```bash
+npm install --global git+https://github.com/itsfrank/jrnl.git#<ref>
+```
+
+npm runs the package's `prepare` script after cloning, which compiles the TypeScript source before installing the CLI. Requires Node.js 22+, Git, and access to Pi either directly or through a configured sandbox command.
+
 ## Development setup
 
 ```bash
@@ -10,7 +26,7 @@ npm run build
 npm link
 ```
 
-Requires Node.js 22+, Git, and access to Pi either directly or through a configured sandbox command.
+Build output in `dist/` is generated locally and ignored by Git.
 
 ## Initialize
 
