@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createRequire } from "node:module";
 import {
   runAsk,
   runNote,
@@ -13,7 +14,7 @@ import { JrnlError } from "./errors.js";
 import { runInit } from "./init.js";
 import { runUpgrade } from "./upgrade.js";
 
-const VERSION = "0.1.0";
+const { version: VERSION } = createRequire(import.meta.url)("../package.json") as { version: string };
 
 const HELP = `jrnl — a Git-backed, AI-assisted personal journal
 

@@ -26,6 +26,13 @@ test("parseCommandLine preserves quoted command arguments", () => {
   ]);
 });
 
+test("--version reads the package version", async () => {
+  const packageJson = JSON.parse(await readFile(join(process.cwd(), "package.json"), "utf8"));
+  const result = run(["--version"], process.env);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.trim(), packageJson.version);
+});
+
 test("editor note input captures Markdown and handles cancellation", async () => {
   const root = await mkdtemp(join(tmpdir(), "jrnl-editor-test-"));
   const fakeEditor = join(root, "fake-editor");
