@@ -17,7 +17,7 @@ import {
 } from "./git.js";
 import { emptyProcessingState, PROCESSING_STATE_PATH, saveProcessingState } from "./journal.js";
 import { AGENTS_MD, INITIAL_PRIORITIES, INITIAL_STATUS, INITIAL_TASKS } from "./prompts.js";
-import { exists, expandHome, parseCommandLine, readStandardInput, runProcess, writeText } from "./utils.js";
+import { exists, expandHome, parseCommandLine, readStandardInput, runProcess, withActivity, writeText } from "./utils.js";
 import { REPOSITORY_VERSION_PATH, repositoryVersionFile } from "./versions.js";
 
 export async function runInit(): Promise<void> {
@@ -26,11 +26,13 @@ export async function runInit(): Promise<void> {
     if (!await isGitRepository(existing.repo)) {
       throw new JrnlError(`Existing configuration points to a non-Git directory: ${existing.repo}`);
     }
-    await requireCompatibleRepository(existing.repo);
-    await syncRepository(existing.repo, {
-      beforePush: async () => {
-        await requireCompatibleRepository(existing.repo, { warnAgents: false });
-      },
+    await withActivity("Synchronizing existing journal", async () => {
+      await requireCompatibleRepository(existing.repo);
+      await syncRepository(existing.repo, {
+        beforePush: async () => {
+          await requireCompatibleRepository(existing.repo, { warnAgents: false });
+        },
+      });
     });
     console.log(`jrnl is already initialized.\n\n${formatConfig(existing).trim()}\n\nConfiguration: ${configPath()}`);
     return;
@@ -67,18 +69,20 @@ export async function runInit(): Promise<void> {
     prompt.close();
   }
 
-  await prepareRepository(folder, gitUrl);
-  const created = await scaffoldJournal(folder);
-  if (created.length > 0) {
-    await commitPaths(folder, created, "Initialize jrnl");
-  }
-  if (!await hasHead(folder)) {
-    throw new JrnlError("Journal repository has no initial commit.");
-  }
-  if ((await gitStatus(folder)).length > 0) {
-    throw new JrnlError("Journal folder contains files outside the generated scaffold. Commit or remove them, then run `jrnl init` again.");
-  }
-  await syncRepository(folder);
+  await withActivity("Preparing journal repository", () => prepareRepository(folder, gitUrl));
+  await withActivity("Creating journal files", async () => {
+    const created = await scaffoldJournal(folder);
+    if (created.length > 0) {
+      await commitPaths(folder, created, "Initialize jrnl");
+    }
+    if (!await hasHead(folder)) {
+      throw new JrnlError("Journal repository has no initial commit.");
+    }
+    if ((await gitStatus(folder)).length > 0) {
+      throw new JrnlError("Journal folder contains files outside the generated scaffold. Commit or remove them, then run `jrnl init` again.");
+    }
+  });
+  await withActivity("Synchronizing journal repository", () => syncRepository(folder));
 
   const config: JrnlConfig = { repo: folder, pi: { command: piCommand } };
   await saveConfig(config);

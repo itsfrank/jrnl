@@ -7,7 +7,7 @@ import { changedPaths, diffStat, git, requireClean, requireGitRepository, restor
 import { scaffoldJournal } from "./init.js";
 import { runResolveConflicts } from "./commands.js";
 import { AGENTS_MANAGED_SECTION } from "./prompts.js";
-import { confirm, exists, writeText } from "./utils.js";
+import { confirm, exists, withActivity, writeText } from "./utils.js";
 import {
   AGENTS_VERSION,
   REPOSITORY_VERSION_PATH,
@@ -35,8 +35,10 @@ const migrations: Migration[] = [
 
 export async function runUpgrade(migrate: boolean): Promise<void> {
   const config = await loadConfig();
-  await requireGitRepository(config.repo);
-  await requireClean(config.repo);
+  await withActivity("Checking journal repository", async () => {
+    await requireGitRepository(config.repo);
+    await requireClean(config.repo);
+  });
   await synchronizeForUpgrade();
 
   const initial = await readRepositoryVersions(config.repo);
@@ -59,15 +61,17 @@ export async function runUpgrade(migrate: boolean): Promise<void> {
   let backupBranch: string | undefined;
   let committed = false;
   try {
-    if (migrate && initial.schemaVersion < SCHEMA_VERSION) {
-      backupBranch = `jrnl/migration-backup-v${initial.schemaVersion}-${Date.now()}`;
-      await git(config.repo, ["branch", backupBranch, "HEAD"]);
-      await runMigrations(config.repo, initial.schemaVersion);
-    }
+    await withActivity(migrate ? "Preparing repository migration" : "Preparing repository upgrade", async () => {
+      if (migrate && initial.schemaVersion < SCHEMA_VERSION) {
+        backupBranch = `jrnl/migration-backup-v${initial.schemaVersion}-${Date.now()}`;
+        await git(config.repo, ["branch", backupBranch, "HEAD"]);
+        await runMigrations(config.repo, initial.schemaVersion);
+      }
 
-    await scaffoldJournal(config.repo);
-    await updateManagedAgents(config.repo);
-    await writeText(join(config.repo, REPOSITORY_VERSION_PATH), repositoryVersionFile());
+      await scaffoldJournal(config.repo);
+      await updateManagedAgents(config.repo);
+      await writeText(join(config.repo, REPOSITORY_VERSION_PATH), repositoryVersionFile());
+    });
 
     const paths = await changedPaths(config.repo);
     if (paths.length === 0) {
@@ -86,17 +90,19 @@ export async function runUpgrade(migrate: boolean): Promise<void> {
       return;
     }
 
-    await git(config.repo, ["add", "-A"]);
-    await git(config.repo, ["commit", "-m", migrate ? "jrnl: migrate repository" : "jrnl: upgrade static files"]);
+    await withActivity("Committing upgrade", async () => {
+      await git(config.repo, ["add", "-A"]);
+      await git(config.repo, ["commit", "-m", migrate ? "jrnl: migrate repository" : "jrnl: upgrade static files"]);
+    });
     committed = true;
-    await syncRepository(config.repo, {
+    await withActivity("Synchronizing upgrade", () => syncRepository(config.repo, {
       beforePush: async () => {
         const versions = await readRepositoryVersions(config.repo);
         if (versions.schemaVersion !== SCHEMA_VERSION) {
           throw new IncompatibleSchemaError("Migration did not produce the expected schema version.");
         }
       },
-    });
+    }));
     console.log(migrate ? "Journal migrated and synced." : "Journal upgraded and synced.");
   } catch (error) {
     if (!committed) await restoreClean(config.repo);
@@ -107,7 +113,7 @@ export async function runUpgrade(migrate: boolean): Promise<void> {
 async function synchronizeForUpgrade(): Promise<void> {
   const config = await loadConfig();
   try {
-    await syncRepository(config.repo);
+    await withActivity("Synchronizing journal repository", () => syncRepository(config.repo));
   } catch (error) {
     if (!(error instanceof GitConflictError)) throw error;
     console.log("Synchronization conflict detected; resolving before upgrade.");

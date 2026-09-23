@@ -4,7 +4,7 @@ import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
-import { stdin, stdout } from "node:process";
+import { stderr, stdin, stdout } from "node:process";
 import { JrnlError } from "./errors.js";
 
 export interface ProcessResult {
@@ -48,6 +48,34 @@ export async function runProcess(
       resolvePromise({ code: code ?? 1, stdout: processStdout, stderr: processStderr });
     });
   });
+}
+
+const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const;
+
+/** Show an animated, elapsed-time status while a task is running in a terminal. */
+export async function withActivity<T>(message: string, task: () => Promise<T>): Promise<T> {
+  if (!stderr.isTTY || process.env.TERM === "dumb") return task();
+
+  const startedAt = Date.now();
+  let frame = 0;
+  const render = () => {
+    const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
+    const elapsed = elapsedSeconds < 60
+      ? `${elapsedSeconds}s`
+      : `${Math.floor(elapsedSeconds / 60)}m ${String(elapsedSeconds % 60).padStart(2, "0")}s`;
+    stderr.write(`\r\x1b[2K${SPINNER_FRAMES[frame % SPINNER_FRAMES.length]} ${message} (${elapsed})`);
+    frame += 1;
+  };
+
+  render();
+  const timer = setInterval(render, 80);
+  timer.unref();
+  try {
+    return await task();
+  } finally {
+    clearInterval(timer);
+    stderr.write("\r\x1b[2K");
+  }
 }
 
 export async function exists(path: string): Promise<boolean> {

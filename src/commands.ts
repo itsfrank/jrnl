@@ -29,22 +29,26 @@ import {
   saveProcessingState,
   writeProcessContext,
 } from "./journal.js";
-import { runConflictPi, runInteractivePi, runProcessingPi, runReadOnlyPi } from "./pi.js";
+import { displayPiOutput, runConflictPi, runInteractivePi, runProcessingPi, runReadOnlyPi } from "./pi.js";
 import { askPrompt, processPrompt, resolvePrompt } from "./prompts.js";
-import { confirm, exists, readStandardInput } from "./utils.js";
+import { confirm, exists, readStandardInput, withActivity } from "./utils.js";
 
 export async function runNote(arguments_: readonly string[]): Promise<void> {
   const config = await loadConfig();
-  await requireGitRepository(config.repo);
-  await requireCompatibleRepository(config.repo);
-  await requireClean(config.repo);
+  await withActivity("Checking journal repository", async () => {
+    await requireGitRepository(config.repo);
+    await requireCompatibleRepository(config.repo);
+    await requireClean(config.repo);
+  });
   const text = await argumentOrStdin(arguments_, "note");
   const path = await createNote(config.repo, text);
-  await commitPaths(config.repo, [path], `jrnl note: ${path.split("/").at(-1)?.replace(/\.md$/, "")}`);
-  const commit = (await git(config.repo, ["rev-parse", "--short", "HEAD"])).stdout.trim();
+  const commit = await withActivity("Saving note", async () => {
+    await commitPaths(config.repo, [path], `jrnl note: ${path.split("/").at(-1)?.replace(/\.md$/, "")}`);
+    return (await git(config.repo, ["rev-parse", "--short", "HEAD"])).stdout.trim();
+  });
 
   try {
-    await syncCompatibleRepository(config, false);
+    await withActivity("Synchronizing note", () => syncCompatibleRepository(config, false));
     console.log(`Note saved and synced.\nFile: ${path}\nCommit: ${commit}`);
   } catch (error) {
     if (error instanceof JrnlError) {
@@ -58,25 +62,30 @@ export async function runNote(arguments_: readonly string[]): Promise<void> {
 
 export async function runSync(): Promise<void> {
   const config = await loadConfig();
-  const result = await syncCompatibleRepository(config);
+  const result = await withActivity("Synchronizing journal repository", () => syncCompatibleRepository(config));
   console.log(result.pushed ? `Synced ${result.branch}; local commits pushed.` : `Synced ${result.branch}; already up to date.`);
 }
 
 export async function runProcessNotes(): Promise<void> {
   const config = await loadConfig();
-  await requireGitRepository(config.repo);
-  await requireCompatibleRepository(config.repo);
+  await withActivity("Checking journal repository", async () => {
+    await requireGitRepository(config.repo);
+    await requireCompatibleRepository(config.repo);
+  });
   const pendingPaths = await changedPaths(config.repo);
   if (pendingPaths.length > 0) {
     const nonNotes = pendingPaths.filter((path) => !path.startsWith("notes/"));
     if (nonNotes.length > 0) {
       throw new JrnlError(`Journal repository has uncommitted changes outside notes/:\n${nonNotes.join("\n")}`);
     }
-    await commitPaths(config.repo, pendingPaths, "jrnl: amend source notes");
+    await withActivity("Saving amended source notes", () =>
+      commitPaths(config.repo, pendingPaths, "jrnl: amend source notes"));
   }
-  await syncCompatibleRepository(config, false);
-  const state = await loadProcessingState(config.repo);
-  const changes = await detectNoteChanges(config.repo, state);
+  await withActivity("Synchronizing source notes", () => syncCompatibleRepository(config, false));
+  const changes = await withActivity("Finding unprocessed note changes", async () => {
+    const state = await loadProcessingState(config.repo);
+    return detectNoteChanges(config.repo, state);
+  });
   const count = noteChangeCount(changes);
   if (count === 0) {
     console.log("Memory is up to date; no note changes to process.");
@@ -85,7 +94,9 @@ export async function runProcessNotes(): Promise<void> {
 
   const contextPath = await writeProcessContext(config.repo, changes);
   try {
-    await runProcessingPi(config, processPrompt(contextPath));
+    const result = await withActivity("Pi is updating journal memory", () =>
+      runProcessingPi(config, processPrompt(contextPath)));
+    displayPiOutput(result);
   } catch (error) {
     await restoreClean(config.repo);
     await removeTemporaryWork(config.repo);
@@ -93,7 +104,7 @@ export async function runProcessNotes(): Promise<void> {
   }
   await removeTemporaryWork(config.repo);
 
-  const paths = await changedPaths(config.repo);
+  const paths = await withActivity("Reviewing Pi's changes", () => changedPaths(config.repo));
   const invalid = paths.filter((path) => !path.startsWith("memory/"));
   if (invalid.length > 0) {
     await restoreClean(config.repo);
@@ -115,14 +126,16 @@ export async function runProcessNotes(): Promise<void> {
     return;
   }
 
-  await saveProcessingState(config.repo, {
-    version: 1,
-    lastProcessedAt: new Date().toISOString(),
-    notes: changes.currentHashes,
+  await withActivity("Committing memory updates", async () => {
+    await saveProcessingState(config.repo, {
+      version: 1,
+      lastProcessedAt: new Date().toISOString(),
+      notes: changes.currentHashes,
+    });
+    await commitPaths(config.repo, ["memory", "state/processed-notes.json"], `jrnl process: ${count} note change${count === 1 ? "" : "s"}`);
   });
-  await commitPaths(config.repo, ["memory", "state/processed-notes.json"], `jrnl process: ${count} note change${count === 1 ? "" : "s"}`);
   try {
-    await syncCompatibleRepository(config, false);
+    await withActivity("Synchronizing memory updates", () => syncCompatibleRepository(config, false));
     console.log("Memory updated and synced.");
   } catch (error) {
     if (error instanceof JrnlError) {
@@ -137,8 +150,9 @@ export async function runProcessNotes(): Promise<void> {
 export async function runAsk(arguments_: readonly string[]): Promise<void> {
   const config = await loadConfig();
   const question = await argumentOrStdin(arguments_, "question");
-  await syncCompatibleRepository(config);
-  await runReadOnlyPi(config, askPrompt(question));
+  await withActivity("Synchronizing journal repository", () => syncCompatibleRepository(config));
+  const result = await withActivity("Pi is searching the journal", () => runReadOnlyPi(config, askPrompt(question)));
+  displayPiOutput(result);
 }
 
 export async function runStatus(): Promise<void> {
@@ -147,7 +161,7 @@ export async function runStatus(): Promise<void> {
   await requireCompatibleRepository(config.repo);
   let syncState = "synced";
   try {
-    await syncCompatibleRepository(config, false);
+    await withActivity("Synchronizing journal repository", () => syncCompatibleRepository(config, false));
   } catch (error) {
     if (error instanceof IncompatibleSchemaError) throw error;
     syncState = `freshness unknown — ${error instanceof Error ? error.message : String(error)}`;
@@ -155,9 +169,12 @@ export async function runStatus(): Promise<void> {
 
   const statusPath = join(config.repo, "memory/STATUS.md");
   const status = await exists(statusPath) ? (await readFile(statusPath, "utf8")).trim() : "# Status\n\nNo status has been generated.";
-  const state = await loadProcessingState(config.repo);
-  const changes = await detectNoteChanges(config.repo, state);
-  const memoryChanged = await memoryChangedAfterStatus(config.repo);
+  const { state, changes, memoryChanged } = await withActivity("Checking status freshness", async () => {
+    const state = await loadProcessingState(config.repo);
+    const changes = await detectNoteChanges(config.repo, state);
+    const memoryChanged = await memoryChangedAfterStatus(config.repo);
+    return { state, changes, memoryChanged };
+  });
   const changeCount = noteChangeCount(changes);
   const staleReasons: string[] = [];
   if (changeCount > 0) {
@@ -175,7 +192,7 @@ export async function runStatus(): Promise<void> {
 
 export async function runPi(forwardedArgs: readonly string[]): Promise<void> {
   const config = await loadConfig();
-  await syncCompatibleRepository(config);
+  await withActivity("Synchronizing journal repository", () => syncCompatibleRepository(config));
   await runInteractivePi(config, forwardedArgs);
 
   const status = await gitStatus(config.repo);
@@ -188,7 +205,7 @@ export async function runPi(forwardedArgs: readonly string[]): Promise<void> {
     await git(config.repo, ["add", "-A"]);
     await git(config.repo, ["commit", "-m", "jrnl: update from Pi session"]);
   }
-  await syncCompatibleRepository(config, false);
+  await withActivity("Synchronizing Pi changes", () => syncCompatibleRepository(config, false));
 }
 
 export async function runResolveConflicts(skipCompatibility = false): Promise<void> {
@@ -196,11 +213,13 @@ export async function runResolveConflicts(skipCompatibility = false): Promise<vo
   if (!skipCompatibility) await requireCompatibleRepository(config.repo);
   let phase: "complete" | "conflict";
   try {
-    phase = await beginRebase(config.repo);
+    phase = await withActivity("Fetching remote changes", () => beginRebase(config.repo));
     if (!skipCompatibility) await requireCompatibleRepository(config.repo, { warnAgents: false });
     while (phase === "conflict") {
       const conflicts = await getUnmergedPaths(config.repo);
-      await runConflictPi(config, resolvePrompt(conflicts));
+      const result = await withActivity("Pi is resolving merge conflicts", () =>
+        runConflictPi(config, resolvePrompt(conflicts)));
+      displayPiOutput(result);
 
       const unstaged = (await git(config.repo, ["diff", "--name-only"])).stdout.split("\n").map((path) => path.trim()).filter(Boolean);
       const untracked = (await git(config.repo, ["ls-files", "--others", "--exclude-standard"])).stdout.split("\n").map((path) => path.trim()).filter(Boolean);
@@ -229,7 +248,7 @@ export async function runResolveConflicts(skipCompatibility = false): Promise<vo
       phase = await continueRebase(config.repo);
     }
     if (!skipCompatibility) await requireCompatibleRepository(config.repo, { warnAgents: false });
-    await pushCurrentBranch(config.repo);
+    await withActivity("Pushing resolved changes", () => pushCurrentBranch(config.repo));
     console.log("Conflicts resolved and repository synced.");
   } catch (error) {
     await abortRebase(config.repo);
