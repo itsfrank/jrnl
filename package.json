@@ -1,0 +1,29 @@
+{
+  "name": "jrnl",
+  "version": "0.1.0",
+  "description": "A Git-backed, AI-assisted personal journal CLI",
+  "type": "module",
+  "bin": {
+    "jrnl": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test",
+    "check": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "smol-toml": "^1.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "UNLICENSED"
+}
