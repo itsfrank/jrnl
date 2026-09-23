@@ -129,6 +129,10 @@ fi
   assert.match(agents, /jrnl:managed:start version=1/);
   assert.match(agents, /## Personal Instructions/);
 
+  const journalPath = run(["path"], env);
+  assert.equal(journalPath.status, 0, journalPath.stderr);
+  assert.equal(journalPath.stdout.trim(), repo);
+
   const noted = run(["note", "Atlas is blocked on security review"], env);
   assert.equal(noted.status, 0, noted.stderr);
   assert.match(noted.stdout, /Note saved and synced/);

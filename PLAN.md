@@ -5,7 +5,7 @@
 - A Git repository provides durable, portable storage and change history.
 - Raw notes are saved chronologically; AI-maintained Markdown files capture current project memory, priorities, and open tasks.
 - `jrnl note "text"` records a note, with `jrnl "text"` as shorthand.
-- `jrnl status`, `jrnl ask`, and `jrnl sync` provide supporting workflows.
+- `jrnl status`, `jrnl ask`, `jrnl sync`, and `jrnl path` provide supporting workflows.
 - `jrnl pi` opens an interactive Pi session with the journal context.
 - Agentic operations use Pi's CLI and its configured default model.
 - The CLI will be written in TypeScript on Node.js with minimal dependencies.
@@ -31,6 +31,12 @@
 - After confirmation, record the processed note IDs and hashes, commit all changes, and sync.
 - Leave declined or failed notes unprocessed so they can be retried.
 - Accept no options beyond `--help`.
+
+## `jrnl path`
+
+- Print only the absolute configured journal repository path, suitable for command substitution such as `cd "$(jrnl path)"`.
+- Do not synchronize or require the configured path to be a valid Git repository.
+- Accept no arguments or options beyond `--help`.
 
 ## `jrnl ask`
 

@@ -68,6 +68,8 @@ jrnl upgrade --migrate                # migrate repository storage
 jrnl status                           # show current status and freshness
 jrnl ask "What is blocked?"           # read-only one-shot question
 jrnl sync
+jrnl path                             # print the configured journal folder
+cd "$(jrnl path)"                      # change to it safely, including paths with spaces
 jrnl resolve-conflicts
 jrnl pi                               # interactive Pi with journal context
 jrnl pi -- --thinking high            # forward arguments to Pi

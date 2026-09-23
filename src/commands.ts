@@ -71,6 +71,11 @@ export async function runSync(): Promise<void> {
   console.log(result.pushed ? `Synced ${result.branch}; local commits pushed.` : `Synced ${result.branch}; already up to date.`);
 }
 
+export async function runPath(): Promise<void> {
+  const config = await loadConfig();
+  console.log(config.repo);
+}
+
 export async function runProcessNotes(): Promise<void> {
   const config = await loadConfig();
   await withActivity("Checking journal repository", async () => {

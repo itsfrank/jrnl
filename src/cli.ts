@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import {
   runAsk,
   runNote,
+  runPath,
   runPi,
   runProcessNotes,
   runResolveConflicts,
@@ -27,6 +28,7 @@ Usage:
   jrnl ask <question>
   jrnl status
   jrnl sync
+  jrnl path
   jrnl resolve-conflicts
   jrnl pi [-- <pi arguments>]
 
@@ -43,6 +45,7 @@ const COMMAND_HELP: Record<string, string> = {
   ask: "Usage: jrnl ask <question>\n       echo <question> | jrnl ask\n\nAsk Pi a read-only question about the journal.",
   status: "Usage: jrnl status\n\nShow current journal status and freshness.",
   sync: "Usage: jrnl sync\n\nSynchronize the clean journal repository.",
+  path: "Usage: jrnl path\n\nPrint the configured journal repository path.",
   "resolve-conflicts": "Usage: jrnl resolve-conflicts\n\nUse Pi to propose and confirm Git conflict resolutions.",
   pi: "Usage: jrnl pi [-- <pi arguments>]\n\nOpen interactive Pi in the journal repository. Arguments after -- are forwarded to Pi.",
 };
@@ -95,6 +98,10 @@ async function main(args: string[]): Promise<void> {
     case "sync":
       requireNoArguments(command, rest);
       await runSync();
+      return;
+    case "path":
+      requireNoArguments(command, rest);
+      await runPath();
       return;
     case "resolve-conflicts":
       requireNoArguments(command, rest);
